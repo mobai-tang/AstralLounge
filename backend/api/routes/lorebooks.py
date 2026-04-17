@@ -16,6 +16,11 @@ class EntryCreate(BaseModel):
     keywords: Optional[List[str]] = []
     priority: Optional[int] = 0
     enabled: Optional[bool] = True
+    strategy: Optional[str] = "keyword"  # constant, keyword, chain
+    probability: Optional[int] = 100     # 0-100
+    insert_position: Optional[str] = "system"  # system, user, assistant
+    exclusion_keywords: Optional[List[str]] = []
+    exclusion_logic: Optional[str] = "none"  # none, and_any, and_all, not_any, not_all
 
 
 class EntryUpdate(BaseModel):
@@ -24,6 +29,11 @@ class EntryUpdate(BaseModel):
     keywords: Optional[List[str]] = None
     priority: Optional[int] = None
     enabled: Optional[bool] = None
+    strategy: Optional[str] = None
+    probability: Optional[int] = None
+    insert_position: Optional[str] = None
+    exclusion_keywords: Optional[List[str]] = None
+    exclusion_logic: Optional[str] = None
 
 
 class LorebookCreate(BaseModel):
@@ -34,6 +44,7 @@ class LorebookCreate(BaseModel):
     insert_mode: Optional[str] = "append"
     force_activation: Optional[bool] = False
     enabled: Optional[bool] = True
+    max_recursion: Optional[int] = 3
 
 
 class LorebookUpdate(BaseModel):
@@ -44,6 +55,7 @@ class LorebookUpdate(BaseModel):
     insert_mode: Optional[str] = None
     force_activation: Optional[bool] = None
     enabled: Optional[bool] = None
+    max_recursion: Optional[int] = None
 
 
 def model_to_dict(book: LorebookModel) -> dict:
@@ -57,6 +69,7 @@ def model_to_dict(book: LorebookModel) -> dict:
         "insertMode": book.insert_mode,
         "forceActivation": book.force_activation,
         "enabled": book.enabled,
+        "maxRecursion": book.max_recursion,
         "createdAt": book.created_at.timestamp() * 1000 if book.created_at else 0,
         "updatedAt": book.updated_at.timestamp() * 1000 if book.updated_at else 0,
         "entries": [
@@ -67,6 +80,11 @@ def model_to_dict(book: LorebookModel) -> dict:
                 "keywords": e.keywords or [],
                 "priority": e.priority,
                 "enabled": e.enabled,
+                "strategy": e.strategy,
+                "probability": e.probability,
+                "insertPosition": e.insert_position,
+                "exclusionKeywords": e.exclusion_keywords or [],
+                "exclusionLogic": e.exclusion_logic,
                 "createdAt": e.created_at.timestamp() * 1000 if e.created_at else 0,
                 "updatedAt": e.updated_at.timestamp() * 1000 if e.updated_at else 0,
             }
@@ -119,7 +137,7 @@ async def update_lorebook(book_id: str, data: LorebookUpdate, db: Session = Depe
     if not book:
         raise HTTPException(status_code=404, detail="世界设定不存在")
     for key, value in data.model_dump(exclude_none=True).items():
-        setattr(book, key.replace("_", "_"), value)
+        setattr(book, key, value)
     db.commit()
     db.refresh(book)
     return model_to_dict(book)
@@ -152,6 +170,11 @@ async def create_entry(book_id: str, data: EntryCreate, db: Session = Depends(ge
         keywords=data.keywords or [],
         priority=data.priority,
         enabled=data.enabled,
+        strategy=data.strategy or "keyword",
+        probability=data.probability or 100,
+        insert_position=data.insert_position or "system",
+        exclusion_keywords=data.exclusion_keywords or [],
+        exclusion_logic=data.exclusion_logic or "none",
     )
     db.add(entry)
     db.commit()
@@ -163,6 +186,11 @@ async def create_entry(book_id: str, data: EntryCreate, db: Session = Depends(ge
         "keywords": entry.keywords or [],
         "priority": entry.priority,
         "enabled": entry.enabled,
+        "strategy": entry.strategy,
+        "probability": entry.probability,
+        "insertPosition": entry.insert_position,
+        "exclusionKeywords": entry.exclusion_keywords or [],
+        "exclusionLogic": entry.exclusion_logic,
         "createdAt": entry.created_at.timestamp() * 1000 if entry.created_at else 0,
         "updatedAt": entry.updated_at.timestamp() * 1000 if entry.updated_at else 0,
     }
@@ -188,6 +216,11 @@ async def update_entry(book_id: str, entry_id: str, data: EntryUpdate, db: Sessi
         "keywords": entry.keywords or [],
         "priority": entry.priority,
         "enabled": entry.enabled,
+        "strategy": entry.strategy,
+        "probability": entry.probability,
+        "insertPosition": entry.insert_position,
+        "exclusionKeywords": entry.exclusion_keywords or [],
+        "exclusionLogic": entry.exclusion_logic,
         "createdAt": entry.created_at.timestamp() * 1000 if entry.created_at else 0,
         "updatedAt": entry.updated_at.timestamp() * 1000 if entry.updated_at else 0,
     }

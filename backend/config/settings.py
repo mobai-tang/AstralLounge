@@ -74,9 +74,35 @@ class Settings(BaseSettings):
     azure_api_key: str = ""
     azure_endpoint: str = ""
     azure_api_version: str = "2024-02-01"
+    azure_deployment: str = ""
     openrouter_api_key: str = ""
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
+
+    # 额外模型 API Keys
+    groq_api_key: str = ""
+    together_api_key: str = ""
+    fireworks_api_key: str = ""
+    novita_api_key: str = ""
+    siliconflow_api_key: str = ""
+
+    # 更多模型 API Keys
+    mistral_api_key: str = ""
+    gemini_api_key: str = ""
+    cohere_api_key: str = ""
+    ai21_api_key: str = ""
+    perplexity_api_key: str = ""
+    xai_api_key: str = ""
+    baichuan_api_key: str = ""
+    zhipu_api_key: str = ""
+    tencent_secret_id: str = ""
+    tencent_secret_key: str = ""
+
+    # 本地模型服务
+    lmstudio_base_url: str = "http://localhost:1234"
+    lmstudio_model: str = "local-model"
+    koboldcpp_base_url: str = "http://localhost:5000"
+    koboldcpp_model: str = "local-model"
 
     # 图片生成
     sd_api_url: str = ""

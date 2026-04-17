@@ -42,6 +42,21 @@ const routes: RouteRecordRaw[] = [
     name: 'Test',
     component: () => import('@/views/TestView.vue'),
   },
+  {
+    path: '/personas',
+    name: 'Personas',
+    component: () => import('@/views/PersonasView.vue'),
+  },
+  {
+    path: '/image-gen',
+    name: 'ImageGen',
+    component: () => import('@/views/ImageGenView.vue'),
+  },
+  {
+    path: '/prompt-manager',
+    name: 'PromptManager',
+    component: () => import('@/views/PromptManagerView.vue'),
+  },
 ]
 
 const router = createRouter({

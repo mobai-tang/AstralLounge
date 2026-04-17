@@ -57,6 +57,12 @@ async def lifespan(app: FastAPI):
     plugin_manager = get_plugin_manager()
     await plugin_manager.load_plugins()
 
+    # 初始化模型提供商注册表
+    from backend.services.model_provider import get_provider_registry
+    provider_registry = get_provider_registry()
+    provider_registry.setup_from_settings(settings)
+    logger.info("模型提供商注册表初始化完成")
+
     logger.info(f"✅ AstralLounge 启动完成 | 版本: 1.0.0")
     yield
 
@@ -87,7 +93,7 @@ def create_app() -> FastAPI:
     )
 
     # 注册路由
-    from backend.api.routes import chat, characters, lorebooks, memory, config, plugins, health, group_chat, tts, summarize, image_gen
+    from backend.api.routes import chat, characters, lorebooks, memory, config, plugins, health, group_chat, tts, summarize, image_gen, personas
 
     app.include_router(health.router, prefix="/api", tags=["健康检查"])
     app.include_router(config.router, prefix="/api/config", tags=["配置"])
@@ -100,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(tts.router, prefix="/api/tts", tags=["语音合成"])
     app.include_router(summarize.router, prefix="/api/summarize", tags=["摘要"])
     app.include_router(image_gen.router, prefix="/api/image", tags=["图片生成"])
+    app.include_router(personas.router, prefix="/api/personas", tags=["用户人设"])
 
     # 挂载前端静态文件
     frontend_path = settings.frontend_path_resolved

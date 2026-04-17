@@ -100,6 +100,7 @@ class LorebookModel(Base):
     insert_mode = Column(String, default="append")
     force_activation = Column(Boolean, default=False)
     enabled = Column(Boolean, default=True)
+    max_recursion = Column(Integer, default=3)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -117,6 +118,12 @@ class LorebookEntryModel(Base):
     keywords = Column(JSON, default=list)
     priority = Column(Integer, default=0)
     enabled = Column(Boolean, default=True)
+    # SillyTavern 高级特性
+    strategy = Column(String, default="keyword")  # constant, keyword, chain
+    probability = Column(Integer, default=100)    # 0-100 触发概率
+    insert_position = Column(String, default="system")  # system, user, assistant
+    exclusion_keywords = Column(JSON, default=list)  # 排除关键词
+    exclusion_logic = Column(String, default="none")  # none, and_any, and_all, not_any, not_all
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

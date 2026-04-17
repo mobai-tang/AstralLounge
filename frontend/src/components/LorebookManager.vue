@@ -92,21 +92,27 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">{{ $t('lorebooks.scanDepth') }}</label>
-              <input v-model.number="bookForm.scanDepth" type="number" class="input" min="0" />
+              <label class="form-label">{{ $t('lorebooks.scanDepth') }}: {{ bookForm.scanDepth }}</label>
+              <input v-model.number="bookForm.scanDepth" type="range" min="0" max="20" step="1" style="width: 100%;" />
             </div>
             <div class="form-group">
               <label class="form-label">{{ $t('lorebooks.contextLength') }}</label>
               <input v-model.number="bookForm.contextLength" type="number" class="input" min="0" />
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">{{ $t('lorebooks.insertMode') }}</label>
-            <select v-model="bookForm.insertMode" class="select">
-              <option value="append">Append</option>
-              <option value="insert">Insert</option>
-              <option value="prioritize">Prioritize</option>
-            </select>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">{{ $t('lorebooks.insertMode') }}</label>
+              <select v-model="bookForm.insertMode" class="select">
+                <option value="append">追加（Append）</option>
+                <option value="insert">插入（Insert）</option>
+                <option value="prioritize">优先（Prioritize）</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">递归深度</label>
+              <input v-model.number="bookForm.maxRecursion" type="number" class="input" min="0" max="10" placeholder="0=无限" />
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -116,32 +122,82 @@
       </div>
     </div>
 
-    <!-- 条目编辑弹窗 -->
+        <!-- 条目编辑弹窗 -->
     <div v-if="showEntryModal" class="modal-overlay" @click.self="showEntryModal = false">
-      <div class="modal" style="max-width: 720px;">
+      <div class="modal" style="max-width: 760px;">
         <div class="modal-header">
           <h2>{{ editingEntry ? $t('lorebooks.editEntry') : $t('lorebooks.addEntry') }}</h2>
           <button class="btn btn-ghost btn-icon" @click="showEntryModal = false">×</button>
         </div>
         <div class="modal-body">
+          <!-- 基础信息 -->
+          <div class="section-title">基础信息</div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">{{ $t('lorebooks.entryName') }} *</label>
               <input v-model="entryForm.name" class="input" />
             </div>
             <div class="form-group">
-              <label class="form-label">{{ $t('lorebooks.priority') }}</label>
+              <label class="form-label">{{ $t('lorebooks.priority') }}（插入顺序）</label>
               <input v-model.number="entryForm.priority" type="number" class="input" />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">{{ $t('lorebooks.entryContent') }}</label>
-            <textarea v-model="entryForm.content" class="input textarea" rows="6"></textarea>
+            <textarea v-model="entryForm.content" class="input textarea" rows="5" placeholder="条目的详细内容..."></textarea>
           </div>
+
+          <!-- 触发设置 -->
+          <div class="section-title">触发设置</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">触发策略</label>
+              <div class="strategy-tabs">
+                <button :class="['tab-btn', { active: entryForm.strategy === 'constant' }]" @click="entryForm.strategy = 'constant'" title="始终插入">🔵 常驻</button>
+                <button :class="['tab-btn', { active: entryForm.strategy === 'keyword' }]" @click="entryForm.strategy = 'keyword'" title="关键词触发">🟢 关键词</button>
+                <button :class="['tab-btn', { active: entryForm.strategy === 'chain' }]" @click="entryForm.strategy = 'chain'" title="递归链接">🔗 链式</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">触发概率: {{ entryForm.probability }}%</label>
+              <input v-model.number="entryForm.probability" type="range" min="0" max="100" step="5" style="width: 100%;" />
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">{{ $t('lorebooks.keywords') }}</label>
-            <input v-model="entryForm.keywordsInput" class="input" placeholder="kw1, kw2, kw3" />
+            <input v-model="entryForm.keywordsInput" class="input" placeholder="kw1, kw2, kw3（逗号分隔）" />
           </div>
+
+          <!-- 排除设置 -->
+          <div class="section-title">排除条件</div>
+          <div class="form-group">
+            <label class="form-label">排除逻辑</label>
+            <select v-model="entryForm.exclusionLogic" class="select" style="width: 100%;">
+              <option value="none">无（不使用排除）</option>
+              <option value="and_any">AND ANY（任一匹配则排除）</option>
+              <option value="and_all">AND ALL（全匹配才排除）</option>
+              <option value="not_any">NOT ANY（不包含任一则排除）</option>
+              <option value="not_all">NOT ALL（不包含全部则排除）</option>
+            </select>
+          </div>
+          <div v-if="entryForm.exclusionLogic !== 'none'" class="form-group">
+            <label class="form-label">排除关键词</label>
+            <input v-model="entryForm.exclusionKeywordsInput" class="input" placeholder="exclude1, exclude2" />
+          </div>
+
+          <!-- 插入位置 -->
+          <div class="section-title">插入位置</div>
+          <div class="form-group">
+            <label class="form-label">插入到</label>
+            <div class="position-tabs">
+              <button :class="['tab-btn', { active: entryForm.insertPosition === 'system' }]" @click="entryForm.insertPosition = 'system'" title="作为系统消息">⚙️ 系统</button>
+              <button :class="['tab-btn', { active: entryForm.insertPosition === 'user' }]" @click="entryForm.insertPosition = 'user'" title="作为用户消息">👤 用户</button>
+              <button :class="['tab-btn', { active: entryForm.insertPosition === 'assistant' }]" @click="entryForm.insertPosition = 'assistant'" title="作为助手消息">🤖 助手</button>
+            </div>
+          </div>
+
+          <!-- 启用开关 -->
           <div class="form-group">
             <label class="toggle-label">
               <div :class="['toggle', { active: entryForm.enabled }]" @click="entryForm.enabled = !entryForm.enabled"></div>
@@ -176,8 +232,19 @@ const editingBook = ref<Lorebook | null>(null)
 const editingEntry = ref<LorebookEntry | null>(null)
 const editingBookId = ref<string | null>(null)
 
-const bookForm = ref({ name: '', description: '', scanDepth: 2, contextLength: 2048, insertMode: 'append' as const })
-const entryForm = ref({ name: '', content: '', keywordsInput: '', priority: 0, enabled: true })
+const bookForm = ref({ name: '', description: '', scanDepth: 2, contextLength: 2048, insertMode: 'append' as const, maxRecursion: 3 })
+const entryForm = ref({
+  name: '',
+  content: '',
+  keywordsInput: '',
+  priority: 0,
+  enabled: true,
+  strategy: 'keyword',
+  probability: 100,
+  insertPosition: 'system',
+  exclusionLogic: 'none',
+  exclusionKeywordsInput: ''
+})
 
 const filteredLorebooks = computed(() => {
   if (!searchQuery.value.trim()) return lorebooks.value
@@ -252,7 +319,18 @@ async function deleteLorebook(id: string) {
 function addEntry(book: Lorebook) {
   editingEntry.value = null
   editingBookId.value = book.id
-  entryForm.value = { name: '', content: '', keywordsInput: '', priority: 0, enabled: true }
+  entryForm.value = {
+    name: '',
+    content: '',
+    keywordsInput: '',
+    priority: 0,
+    enabled: true,
+    strategy: 'keyword',
+    probability: 100,
+    insertPosition: 'system',
+    exclusionLogic: 'none',
+    exclusionKeywordsInput: ''
+  }
   showEntryModal.value = true
 }
 
@@ -264,7 +342,12 @@ function editEntry(book: Lorebook, entry: LorebookEntry) {
     content: entry.content,
     keywordsInput: entry.keywords?.join(', ') ?? '',
     priority: entry.priority,
-    enabled: entry.enabled
+    enabled: entry.enabled,
+    strategy: (entry as any).strategy ?? 'keyword',
+    probability: (entry as any).probability ?? 100,
+    insertPosition: (entry as any).insertPosition ?? 'system',
+    exclusionLogic: (entry as any).exclusionLogic ?? 'none',
+    exclusionKeywordsInput: ((entry as any).exclusionKeywords ?? []).join(', ')
   }
   showEntryModal.value = true
 }
@@ -274,9 +357,16 @@ async function saveEntry() {
   const data = {
     name: entryForm.value.name,
     content: entryForm.value.content,
-    keywords: entryForm.value.keywordsInput.split(',').map(k => k.trim()).filter(Boolean),
+    keywords: entryForm.value.keywordsInput.split(',').map((k: string) => k.trim()).filter(Boolean),
     priority: entryForm.value.priority,
-    enabled: entryForm.value.enabled
+    enabled: entryForm.value.enabled,
+    strategy: entryForm.value.strategy,
+    probability: entryForm.value.probability,
+    insert_position: entryForm.value.insertPosition,
+    exclusion_keywords: entryForm.value.exclusionLogic !== 'none'
+      ? entryForm.value.exclusionKeywordsInput.split(',').map((k: string) => k.trim()).filter(Boolean)
+      : [],
+    exclusion_logic: entryForm.value.exclusionLogic,
   }
   try {
     const url = editingEntry.value
@@ -419,6 +509,44 @@ onMounted(async () => {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .toggle-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 8px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.strategy-tabs, .position-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
+.tab-btn.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
 
 @media screen and (max-width: 640px) {
   .form-row { grid-template-columns: 1fr; }

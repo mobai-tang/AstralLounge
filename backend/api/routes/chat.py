@@ -1,7 +1,6 @@
 """对话管理路由"""
 import uuid
 import json
-import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,8 +8,12 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db, ChatSessionModel, MessageModel, GroupModel, CharacterModel, LorebookModel, MemoryModel
+from backend.services.memory_cache import memory_cache
 from backend.config.settings import settings
-from backend.plugins.plugin_manager import get_plugin_manager
+from backend.services.model_provider import (
+    chat_with_provider, get_provider_registry, ModelProviderConfig,
+    ChatMessage
+)
 
 router = APIRouter()
 
@@ -154,13 +157,12 @@ async def send_message(session_id: str, payload: MessageCreate, db: Session = De
     # 获取世界设定条目（关键词匹配）
     lorebook_content = _get_lorebook_context(db, payload.content)
 
-    # 获取相关记忆
-    memory_content = _get_relevant_memory(db, payload.content)
+    # 获取相关记忆（优先从 Redis 读取，Redis 不可用则回退 SQLite）
+    memory_content = await _get_relevant_memory(db, payload.content, session_id)
 
     async def generate():
         full_response = ""
         try:
-            # 构建系统提示词
             system_parts = []
 
             if char:
@@ -187,133 +189,26 @@ async def send_message(session_id: str, payload: MessageCreate, db: Session = De
             else:
                 system_prompt = "你是一个有帮助的AI助手。"
 
-            # 构建消息历史
             messages = [{"role": "system", "content": system_prompt}]
             for m in session.messages:
                 messages.append({"role": m.role, "content": m.content})
             messages.append({"role": "user", "content": payload.content})
 
             model_type = session.model or settings.default_model_type
+            model_name = session.model or settings.default_model_name
 
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                if model_type == "deepseek" and settings.deepseek_api_key:
-                    async with client.stream(
-                        "POST",
-                        f"{settings.deepseek_base_url}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {settings.deepseek_api_key}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": "deepseek-chat",
-                            "messages": messages,
-                            "stream": True,
-                            "temperature": session.temperature or 0.7,
-                            "max_tokens": session.max_tokens or 4096,
-                        }
-                    ) as resp:
-                        async for line in resp.aiter_lines():
-                            if line and line.startswith("data:"):
-                                if line.strip() == "data: [DONE]":
-                                    break
-                                try:
-                                    data = json.loads(line[5:])
-                                    content = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if content:
-                                        full_response += content
-                                        yield content
-                                except json.JSONDecodeError:
-                                    continue
+            chat_messages = [ChatMessage(role=m["role"], content=m["content"]) for m in messages]
 
-                elif model_type in ("anthropic", "claude") and settings.claude_api_key:
-                    # Anthropic Claude API (非流式，因为Claude的streaming格式不同)
-                    sync_messages = [{"role": m["role"], "content": m["content"]} for m in messages[1:]]
-                    resp = await client.post(
-                        f"{settings.claude_base_url}/messages",
-                        headers={
-                            "x-api-key": settings.claude_api_key,
-                            "anthropic-version": settings.antropic_api_version,
-                            "content-type": "application/json"
-                        },
-                        json={
-                            "model": "claude-3-5-haiku-20241022",
-                            "max_tokens": session.max_tokens or 4096,
-                            "system": messages[0]["content"],
-                            "messages": sync_messages,
-                            "stream": True,
-                        }
-                    )
-                    async for line in resp.aiter_lines():
-                        if line and line.startswith("data:"):
-                            if line.strip() == "data: [DONE]":
-                                break
-                            try:
-                                data = json.loads(line[5:])
-                                delta = data.get("delta", {})
-                                if delta.get("type") == "content_block_delta":
-                                    content = delta.get("text", "")
-                                    if content:
-                                        full_response += content
-                                        yield content
-                            except json.JSONDecodeError:
-                                continue
-
-                elif model_type == "openai" and settings.openai_api_key:
-                    async with client.stream(
-                        "POST",
-                        f"{settings.openai_base_url}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {settings.openai_api_key}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": session.model or "gpt-3.5-turbo",
-                            "messages": messages,
-                            "stream": True,
-                            "temperature": session.temperature or 0.7,
-                            "max_tokens": session.max_tokens or 4096,
-                        }
-                    ) as resp:
-                        async for line in resp.aiter_lines():
-                            if line and line.startswith("data:"):
-                                if line.strip() == "data: [DONE]":
-                                    break
-                                try:
-                                    data = json.loads(line[5:])
-                                    content = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if content:
-                                        full_response += content
-                                        yield content
-                                except json.JSONDecodeError:
-                                    continue
-
-                else:
-                    # 默认 Ollama
-                    async with client.stream(
-                        "POST",
-                        f"{settings.ollama_base_url}/api/chat",
-                        json={
-                            "model": session.model or settings.default_model_name,
-                            "messages": messages,
-                            "stream": True,
-                            "options": {
-                                "temperature": session.temperature or 0.7,
-                                "num_predict": session.max_tokens or 4096,
-                            }
-                        }
-                    ) as resp:
-                        async for line in resp.aiter_lines():
-                            if line:
-                                try:
-                                    data = json.loads(line)
-                                    content = data.get("message", {}).get("content", "")
-                                    if content:
-                                        full_response += content
-                                        yield content
-                                    if data.get("done"):
-                                        break
-                                except json.JSONDecodeError:
-                                    continue
+            async for chunk in chat_with_provider(
+                provider_name=model_type,
+                messages=chat_messages,
+                model=model_name,
+                temperature=session.temperature or 0.7,
+                max_tokens=session.max_tokens or 4096,
+                stream=True,
+            ):
+                full_response += chunk
+                yield chunk
 
             # 保存助手消息
             assistant_msg = MessageModel(
@@ -380,8 +275,25 @@ def _get_lorebook_context(db, query: str) -> str:
         return ""
 
 
-def _get_relevant_memory(db, query: str) -> str:
-    """获取相关记忆"""
+async def _get_relevant_memory(db, query: str, session_id: str = "") -> str:
+    """获取相关记忆，优先从 Redis 读取，Redis 不可用则回退 SQLite"""
+
+    redis_memories = await memory_cache.search_by_keywords(query, limit=5)
+    if redis_memories:
+        await memory_cache.increment_access(redis_memories[0].get("id", ""))
+        await memory_cache.append_to_recent(redis_memories[0].get("id", ""))
+
+        recent_memories = await memory_cache.get_recent_memories(limit=3)
+        all_memories = {m.get("id"): m for m in redis_memories}
+        for r in recent_memories:
+            if r.get("id") not in all_memories:
+                all_memories[r.get("id")] = r
+
+        lines = []
+        for m in list(all_memories.values())[:3]:
+            lines.append(f"- {m.get('title', '无标题')}: {m.get('content', '')}")
+        return "\n".join(lines)
+
     try:
         memories = db.query(MemoryModel).filter(
             MemoryModel.content.contains(query)

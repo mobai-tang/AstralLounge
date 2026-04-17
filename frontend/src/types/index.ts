@@ -56,6 +56,11 @@ export interface LorebookEntry {
   keywords: string[]
   priority: number
   enabled: boolean
+  strategy?: 'constant' | 'keyword' | 'chain'
+  probability?: number
+  insertPosition?: 'system' | 'user' | 'assistant'
+  exclusionKeywords?: string[]
+  exclusionLogic?: 'none' | 'and_any' | 'and_all' | 'not_any' | 'not_all'
   createdAt?: number
   updatedAt?: number
 }
@@ -68,6 +73,7 @@ export interface Lorebook {
   contextLength?: number
   insertMode?: 'append' | 'insert' | 'prioritize'
   forceActivation?: boolean
+  maxRecursion?: number
   entries: LorebookEntry[]
   createdAt?: number
   updatedAt?: number
@@ -120,9 +126,39 @@ export interface ModelSettings {
   temperature?: number
   max_tokens?: number
   top_p?: number
+  top_k?: number
   presence_penalty?: number
   frequency_penalty?: number
+  repeat_penalty?: number
   stream?: boolean
+}
+
+export interface ModelParams {
+  temperature: number
+  maxTokens: number
+  topP: number
+  topK: number
+  presencePenalty: number
+  frequencyPenalty: number
+  repeatPenalty: number
+  stopSequences: string[]
+  stream: boolean
+  typingEffect: boolean
+}
+
+export interface ModelProviderInfo {
+  id: string
+  name: string
+  description: string
+  category: 'local' | 'cloud' | 'aggregate' | 'custom'
+  requiresApiKey: boolean
+  defaultUrl: string
+  defaultModel: string
+  color: string
+  models: string[]
+  hasApiKey: boolean
+  baseUrl: string
+  currentModel: string
 }
 
 export interface TTSSettings {
@@ -150,6 +186,18 @@ export interface SafetySettings {
   sensitive_action?: 'block' | 'warn' | 'ignore'
   blocked_words?: string[]
   sensitive_words?: string[]
+}
+
+// ============ 用户人设相关 ============
+export interface Persona {
+  id: string
+  name: string
+  description?: string
+  avatar?: string
+  systemPrompt?: string
+  isDefault?: boolean
+  createdAt?: number
+  updatedAt?: number
 }
 
 // ============ 通知相关 ============

@@ -29,6 +29,18 @@
             <span class="nav-icon">🔌</span>
             <span class="nav-text">插件</span>
           </router-link>
+          <router-link to="/personas" class="nav-link" active-class="active">
+            <span class="nav-icon">🪪</span>
+            <span class="nav-text">人设</span>
+          </router-link>
+          <router-link to="/image-gen" class="nav-link" active-class="active">
+            <span class="nav-icon">🖼️</span>
+            <span class="nav-text">生图</span>
+          </router-link>
+          <router-link to="/prompt-manager" class="nav-link" active-class="active">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">Prompt</span>
+          </router-link>
         </nav>
       </div>
 
@@ -86,6 +98,9 @@
         <router-link to="/lorebooks" class="mobile-nav-link" @click="showMobileMenu = false">📚 世界</router-link>
         <router-link to="/memory" class="mobile-nav-link" @click="showMobileMenu = false">🧠 记忆</router-link>
         <router-link to="/plugins" class="mobile-nav-link" @click="showMobileMenu = false">🔌 插件</router-link>
+        <router-link to="/personas" class="mobile-nav-link" @click="showMobileMenu = false">🪪 人设</router-link>
+        <router-link to="/image-gen" class="mobile-nav-link" @click="showMobileMenu = false">🖼️ 生图</router-link>
+        <router-link to="/prompt-manager" class="mobile-nav-link" @click="showMobileMenu = false">📝 Prompt</router-link>
         <router-link to="/settings" class="mobile-nav-link" @click="showMobileMenu = false">⚙️ 设置</router-link>
       </nav>
     </div>

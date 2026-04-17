@@ -104,7 +104,7 @@ async def update_persona(persona_id: str, data: PersonaUpdate, db: Session = Dep
         db.query(PersonaModel).filter(PersonaModel.is_default == True).update({"is_default": False})
 
     for key, value in data.model_dump(exclude_none=True).items():
-        setattr(persona, key.replace("_", "_"), value)
+        setattr(persona, key, value)
     db.commit()
     db.refresh(persona)
     return model_to_dict(persona)

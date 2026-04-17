@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { ModelSettings, TTSSettings, UISettings, SafetySettings } from '@/types'
+import type { ModelSettings, TTSSettings, UISettings, SafetySettings, ModelProviderInfo } from '@/types'
 
 const API_BASE = '/api'
 
@@ -20,6 +20,10 @@ export const useSettingsStore = defineStore('settings', () => {
     frequency_penalty: 0,
     stream: true
   })
+
+  // 模型提供商列表
+  const providers = ref<ModelProviderInfo[]>([])
+  const providersLoaded = ref(false)
 
   // TTS 设置
   const tts = ref<TTSSettings>({
@@ -68,6 +72,46 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch (e) {
       console.error('加载设置失败:', e)
     }
+  }
+
+  async function loadProviders() {
+    try {
+      const res = await fetch(`${API_BASE}/config/providers`)
+      if (res.ok) {
+        const data = await res.json()
+        providers.value = data.providers || []
+        providersLoaded.value = true
+      }
+    } catch (e) {
+      console.error('加载提供商列表失败:', e)
+    }
+  }
+
+  async function testProvider(providerId: string, apiKey?: string, baseUrl?: string, modelName?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/config/providers/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: providerId, apiKey, baseUrl, model: modelName })
+      })
+      const data = await res.json()
+      return { success: data.success, message: data.message }
+    } catch (e) {
+      return { success: false, message: '测试请求失败' }
+    }
+  }
+
+  async function getProviderModels(providerId: string): Promise<string[]> {
+    try {
+      const res = await fetch(`${API_BASE}/config/providers/${providerId}/models`)
+      if (res.ok) {
+        const data = await res.json()
+        return data.models || []
+      }
+    } catch (e) {
+      console.error('获取模型列表失败:', e)
+    }
+    return []
   }
 
   async function saveSettings() {
@@ -147,12 +191,17 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     model,
+    providers,
+    providersLoaded,
     tts,
     ui,
     safety,
     isLoaded,
     isSaving,
     loadSettings,
+    loadProviders,
+    testProvider,
+    getProviderModels,
     saveSettings,
     testConnection,
     applyTheme
