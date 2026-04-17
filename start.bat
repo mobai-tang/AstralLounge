@@ -57,10 +57,7 @@ REM 等待后端启动
 timeout /t 3 /nobreak > nul
 
 REM 检查后端是否启动成功
-curl -s http://localhost:8000/api/health > nul 2>&1
-if errorlevel 1 (
-    echo [警告] 后端可能未启动成功，请检查 backend.log
-)
+powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://localhost:8000/api/health' -TimeoutSec 2 -UseBasicParsing; if ($response.StatusCode -ne 200) { Write-Host '[警告] 后端可能未启动成功，请检查 backend.log' } } catch { Write-Host '[警告] 后端可能未启动成功，请检查 backend.log' }" > nul 2>&1
 
 REM 启动前端
 cd frontend
